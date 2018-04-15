@@ -1,6 +1,6 @@
 <?php
 	//BOT Settings
-	$token = '560142313:AAGgLrtxTgB_cMBr0ZNUDwFg_Q6FGN69Fuo'; //Telegram BOT Token
+	$token = ''; //Telegram BOT Token
 
 	//MySQL Settings
 	$host = "localhost"; //DB Host
