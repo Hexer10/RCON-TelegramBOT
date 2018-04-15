@@ -8,3 +8,7 @@ Allows connecting to the RCON using a TelegramBOT
 3. Configure the settings (config.php) with your Database & BOT info.
 4. [Setup bot webhook](https://core.telegram.org/bots/webhooks).
 5. Start chatting with the bot!
+
+
+
+Soon there will a public one!
