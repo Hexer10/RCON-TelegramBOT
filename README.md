@@ -11,4 +11,4 @@ Allows connecting to the RCON using a TelegramBOT
 
 
 
-Soon there will a public one!
+Soon there will a public bot that you can use without installing it by yourself!
