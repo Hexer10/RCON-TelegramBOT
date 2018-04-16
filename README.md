@@ -2,7 +2,7 @@
 Allows connecting to the RCON using a TelegramBOT
 
 # Usage
-You can use the bot by begin [chatting with him](https://t.me/@SM_API_BOT) or by installing it on your server!
+You can use the bot by begin [chatting with him](https://t.me/SM_API_BOT) or by installing it on your server!
 
 # Install
 1. [Create a Telegram BOT ](https://core.telegram.org/bots#3-how-do-i-create-a-bot).
