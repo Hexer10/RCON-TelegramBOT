@@ -241,10 +241,6 @@ else{
 function sendMessage($text){
 	global $chatID;
 	$sendto = API_URL."sendmessage?chat_id=".$chatID."&text=".urlencode($text)."&parse_mode=markdown";
-	$file = fopen("file.txt", "a");
-	fwrite($file, $sendto);
-	fclose($file);
-
 	file_get_contents($sendto);
 }
 ?>
