@@ -105,8 +105,11 @@ if (substr($message, 0, 10) === "/delserver" && $message[10] == " ")  {
 		die();
 	}
 
-	if (mysqli_num_rows($sql) > 0){
-		$sql = "DELETE FROM `telegram` WHERE `chatID` = '$chatID' AND 'name' = '$name'";
+	if (!mysqli_num_rows($sql)){
+		sendMessage("Couldn't find a server named '$name'");
+	}
+	else {
+		$sql = "DELETE FROM `telegram` WHERE `chatID` = '$chatID' AND `name` = '$name'";
 
 		$sql = $db->query($sql);
 
@@ -114,10 +117,9 @@ if (substr($message, 0, 10) === "/delserver" && $message[10] == " ")  {
 			sendMessage("Query failed: " .$db->error);
 			die();
 		}
+		
+		
 		sendMessage("Deleted $name");
-	}
-	else{
-		sendMessage("Couldn't find a server named '$name'");
 	}
 	$sql->close();
 	$db->close();
