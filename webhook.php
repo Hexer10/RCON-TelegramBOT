@@ -12,12 +12,14 @@ $update = json_decode($content, true);
 $chatID = $update["message"]["chat"]["id"];
 $message = $update["message"]["text"];
 
-$db = mysqli_connect($host, $name, $password, $database);
+$db = new mysqli($host, $name, $password, $database);
 
 if ($db->connect_error) {
-	sendMessage("Connection failed: " . $conn->connect_error);
+    sendMessage('Connect Error (' . $db->connect_errno . ') '
+            . $db->connect_error);
 	die();
 }
+
 
 $sql = "CREATE TABLE IF NOT EXISTS `telegram` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -105,11 +107,8 @@ if (substr($message, 0, 10) === "/delserver" && $message[10] == " ")  {
 		die();
 	}
 
-	if (!mysqli_num_rows($sql)){
-		sendMessage("Couldn't find a server named '$name'");
-	}
-	else {
-		$sql = "DELETE FROM `telegram` WHERE `chatID` = '$chatID' AND `name` = '$name'";
+	if (mysqli_num_rows($sql) > 0){
+		$sql = "DELETE FROM `telegram` WHERE `chatID` = '$chatID' AND 'name' = '$name'";
 
 		$sql = $db->query($sql);
 
@@ -117,9 +116,10 @@ if (substr($message, 0, 10) === "/delserver" && $message[10] == " ")  {
 			sendMessage("Query failed: " .$db->error);
 			die();
 		}
-		
-		
 		sendMessage("Deleted $name");
+	}
+	else{
+		sendMessage("Couldn't find a server named '$name'");
 	}
 	$sql->close();
 	$db->close();
@@ -243,6 +243,7 @@ else{
 function sendMessage($text){
 	global $chatID;
 	$sendto = API_URL."sendmessage?chat_id=".$chatID."&text=".urlencode($text)."&parse_mode=markdown";
+
 	file_get_contents($sendto);
 }
 ?>
