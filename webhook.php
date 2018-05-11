@@ -13,10 +13,6 @@ $update = json_decode($content, true);
 $chatID = $update["message"]["chat"]["id"];
 $message = $update["message"]["text"];
 
-sendMessage(json_encode($update));
-$message = "/info Hex";
-$chatID = 269432317;
-
 $db = new mysqli($host, $name, $password, $database);
 
 if ($db->connect_error) {
@@ -147,11 +143,6 @@ else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
     $sql = "SELECT * FROM `telegram` WHERE `chatID`= '$chatID' AND `name` = '$name'";
     $sql = $db->query($sql);
 
-    if (!$sql){
-        sendMessage("Query failed: " .$db->error);
-        die();
-    }
-
     if (empty($ip)){
         if ($sql->num_rows > 0){
             $result = $sql->fetch_array();
@@ -191,6 +182,9 @@ else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
             $sql->close();
             $db->close();
         }
+        else if ($sql->num_rows >= $maxServers){
+            sendMessage("There are max " .$maxServers.  "server allowed!");
+        }
         else {
             sendMessage(sprintf("Connecting to %s:%s (%s) ...", $ip, $port, $name));
 
@@ -219,44 +213,9 @@ else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
 else if (substr($message, 0, 5) === "/rcon" && strlen($message) == 5)  {
     sendMessage("Invalid command format:  /rcon (Name) (IP) (Port) (Password)");
 }
-//Serverlist command
-else if (substr($message, 0, 5) === "/info" && $message[5] == " ") {
-    $message = trim(preg_replace('/\s\s+/', ' ', str_replace("\n", " ", $message)));
-    $explode = explode(" ", $message, 2);
-
-    $strArr = $explode;
-    $name = $strArr[1];
-
-    $sql = "SELECT * FROM `telegram` WHERE `chatID`= '$chatID' AND `name` = '$name'";
-    $sql = $db->query($sql);
-
-    if ($sql->num_rows == 0){
-        sendMessage("Unable to find a server named: " .$name);
-    }
-    else {
-
-        try {
-            $result = $sql->fetch_array();
-            $rcon = new SourceQuery();
-            $rcon->Connect("hexah.net", 27015);
-
-            $rcon->SetRconPassword("koala");
-
-            print_r($rcon->GetRules());
-
-            $players = $rcon->GetPlayers();
-            //$reply;
-
-            // foreach ($players as $player) {
-            //     $reply = sprintf("%s\n", $player['name']);
-            // }
-            //sendMessage("b");
-        } catch (Exception $e) {
-            sendMessage($e->getMessage());
-        } finally {
-            $rcon->Disconnect();
-        }
-    }
+//Invalid command
+else{
+    sendMessage("Unknown command: <code>$message</code>, type /start to display the available commands!");
 }
 
 function sendMessage($text){

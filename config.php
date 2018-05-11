@@ -1,6 +1,7 @@
 <?php
 	//BOT Settings
 	$token = ''; //Telegram BOT Token
+    $maxServers = 10;
 
 	//MySQL Settings
 	$host = "localhost"; //DB Host
