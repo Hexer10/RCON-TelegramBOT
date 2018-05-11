@@ -219,7 +219,6 @@ else{
 }
 
 function sendMessage($text){
-    echo $text;
     global $chatID;
     $sendto = API_URL."sendmessage?chat_id=".$chatID."&text=".urlencode($text)."&parse_mode=html";
 
