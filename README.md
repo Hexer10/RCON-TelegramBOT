@@ -13,6 +13,5 @@ You can use the bot by begin [chatting with him](https://t.me/SM_API_BOT) or by 
 
 # Credits
 * Me
-* SourceBans++ Dev Team (For the RCON inc)
-
-Soon there will a public bot that you can use without installing it by yourself!
+* xPax (For [SourceQuery](https://github.com/xPaw/PHP-Source-Query))
+* SourceBans++ Dev Team (For the RCON inc) (Old version)
