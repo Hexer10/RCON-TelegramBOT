@@ -1,10 +1,8 @@
-
 <?php
 require("config.php");
 require_once 'SourceQuery/bootstrap.php';
 
 use xPaw\SourceQuery\SourceQuery;
-
 
 define('API_URL', 'https://api.telegram.org/bot'.$token.'/');
 //read incoming info and grab the chatID
@@ -15,12 +13,16 @@ $update = json_decode($content, true);
 $chatID = $update["message"]["chat"]["id"];
 $message = $update["message"]["text"];
 
+sendMessage(json_encode($update));
+$message = "/info Hex";
+$chatID = 269432317;
+
 $db = new mysqli($host, $name, $password, $database);
 
 if ($db->connect_error) {
     sendMessage('Connect Error (' . $db->connect_errno . ') '
-            . $db->connect_error);
-	die();
+        . $db->connect_error);
+    die();
 }
 
 
@@ -37,47 +39,42 @@ $sql = "CREATE TABLE IF NOT EXISTS `telegram` (
 
 $sql = $db->query($sql);
 
-$sql = "SELECT * FROM `telegram` WHERE `chatID`= $chatID";
+$sql = "SELECT * FROM `telegram` WHERE `chatID`= $chatID AND `connected` = 1";
 $sql = $db->query($sql);
 
+
 if ($sql->num_rows > 0){
-	$result = mysqli_fetch_array($sql);
-	if (!empty($result['connected'])){
-		if (substr($message, 0, 11) === "/disconnect" && strlen($message) == 11){
-			$sql = "UPDATE `telegram` SET `connected` = '0' WHERE `chatID` = $chatID";
-			$sql = $db->query($sql);
+    $result = $sql->fetch_array();
+    //Send cmds to the RCON
+    if (!empty($result['connected'])){
+        if (substr($message, 0, 11) === "/disconnect" && strlen($message) == 11){
+            $sql = "UPDATE `telegram` SET `connected` = '0' WHERE `chatID` = $chatID";
+            $sql = $db->query($sql);
 
-			if (!$sql){
-				sendMessage("Failed to disconnect: " .$db->error);
-				die();
-			}
-
-				sendMessage(sprintf("Disconnected from: %s (%s:%s)", $result['name'], $result['ip'], $result['port']));
-				die();
-		}
-
-		sendMessage("Sending command: $message");
-        try{
-            $rcon = new SourceQuery();
-
-            $rcon->Connect($result['ip'], $result['port']);
-
-            $rcon->SetRconPassword($result['password']);
-
-            sendMessage($rcon->Rcon(sprintf("%s", $message))); //Fix injections?
+            sendMessage(sprintf("Disconnected from: %s (%s:%s)", $result['name'], $result['ip'], $result['port']));
         }
-        catch(Exception $e) {
-            sendMessage($e->getMessage());
+        else {
+            sendMessage("Sending command: $message");
+            try {
+                $rcon = new SourceQuery();
+
+                $rcon->Connect($result['ip'], $result['port']);
+
+                $rcon->SetRconPassword($result['password']);
+
+                sendMessage($rcon->Rcon(sprintf("%s", $message))); //Fix injections?
+            } catch (Exception $e) {
+                sendMessage($e->getMessage());
+            } finally {
+                $rcon->Disconnect();
+            }
         }
-        finally {
-            $rcon->Disconnect();
-        }
-		die();
-	}
+    }
 }
 
-if ((substr($message, 0, 10) === "/start" && strlen($message) ==  6) || (substr($message, 0, 5) === "/help" && strlen($message) ==  5) || $message[0] != "/") {
-	sendMessage("Hi! \n\n This bot allows you to connect using RCON to any source server.\n\n
+//the bot was started (or typed /start or /help)
+else if ((substr($message, 0, 10) === "/start" && strlen($message) ==  6) || (substr($message, 0, 5) === "/help" && strlen($message) ==  5) || $message[0] != "/") {
+    sendMessage("Hi! \n\n This bot allows you to connect using RCON to any source server.\n\n
 			<b>Available commands</b>: \n<b>1.</b> /rcon  (ServerName) (IP) (Port) (Password) --> `Adds a server to the database and connects to it.`
 					  \n<b>2.</b> /rcon	<code>(ServerName)</code> --> Connects to an added server.
 					  \n<b>3.</b> /serverlist --> Displays added servers.
@@ -86,82 +83,80 @@ if ((substr($message, 0, 10) === "/start" && strlen($message) ==  6) || (substr(
 					  \n<code>Every command that it's sent from after connecting is sent to the Server's RCON. DON'T type /kick but only kick(or sm_kick)\nThe session never expires.
 					  \nSpaces in the ServerName are not allowed!</code>
 					  \n\n<code>Type again</code> /start <code>to display this message</code>");
-	die();
 }
 
-if (substr($message, 0, 10) === "/delserver" && $message[10] == " ")  {
-	$message = trim(preg_replace('/\s\s+/', ' ', str_replace("\n", " ", $message)));
-	$explode = explode(" ", $message, 2);
+// delserver command
+else if (substr($message, 0, 10) === "/delserver" && $message[10] == " ")  {
+    $message = trim(preg_replace('/\s\s+/', ' ', str_replace("\n", " ", $message)));
+    $explode = explode(" ", $message, 2);
 
-	$strArr = $explode;
+    $strArr = $explode;
 
-	$name = $strArr[1];
+    $name = $strArr[1];
 
-	$sql = "DELETE FROM `telegram` WHERE `chatID` = '$chatID' AND `name` = '$name'";
+    $sql = "DELETE FROM `telegram` WHERE `chatID` = '$chatID' AND `name` = '$name'";
 
-	$sql = $db->query($sql);
+    $sql = $db->query($sql);
 
-	if ($db->affected_rows == 0){
-	    sendMessage("Unable to find a server called <code>".$name."</code>");
+    if ($db->affected_rows == 0){
+        sendMessage("Unable to find a server called <code>".$name."</code>");
     }
-	elseif (!$sql){
-		sendMessage("Query failed: " .$db->error);
-	}
-	else
-	    sendMessage("Deleted $name");
+    else if (!$sql){
+        sendMessage("Query failed: " .$db->error);
+    }
+    else
+        sendMessage("Deleted $name");
 
-	$sql->close();
-	$db->close();
+    $sql->close();
+    $db->close();
 }
+//Invalid /delserver format
 else if (substr($message, 0, 10) === "/delserver" && strlen($message) == 10) {
-	sendMessage("Invalid /delserver format: /delserver (ServerName)");
+    sendMessage("Invalid /delserver format: /delserver (ServerName)");
 }
+// serverlist command
 else if (substr($message, 0, 11) === "/serverlist" && strlen($message) == 11 || $message[11] == " ")  {
 
-	$sql = "SELECT * FROM `telegram` WHERE `chatID`= '$chatID'";
-	$sql = $db->query($sql);
+    $sql = "SELECT * FROM `telegram` WHERE `chatID`= '$chatID'";
+    $sql = $db->query($sql);
 
-	if (!$sql){
-		sendMessage("Query failed: " .$db->error);
-		die();
-	}
-
-	$i = 1;
-	if (mysqli_num_rows($sql) == 0){
-		sendMessage("You haven't added any server! Type /rcon (Name) (IP) (Port) (Password) ");
-	}
-	else{
-		while($result = mysqli_fetch_array($sql)){
-			sendMessage(sprintf("%s. %s (%s:%s)", $i++, $result['name'], $result['ip'], $result['port']));
-		}
-	}
+    $i = 1;
+    if (mysqli_num_rows($sql) == 0){
+        sendMessage("You haven't added any server! Type /rcon (Name) (IP) (Port) (Password) ");
+    }
+    else{
+        while($result = mysqli_fetch_array($sql)){
+            sendMessage(sprintf("%s. %s (%s:%s)", $i++, $result['name'], $result['ip'], $result['port']));
+        }
+    }
 
 }
+// rcon command
 else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
-	$message = trim(preg_replace('/\s\s+/', ' ', str_replace("\n", " ", $message)));
-	$explode = explode(" ", $message, 5);
+    $message = trim(preg_replace('/\s\s+/', ' ', str_replace("\n", " ", $message)));
+    $explode = explode(" ", $message, 5);
 
-	$strArr = $explode;
+    $strArr = $explode;
 
-	$name = $strArr[1];
-	$ip = $strArr[2];
-	$port = $strArr[3];
-	$password = $strArr[4];
-	$connected = "1";
+    $name = $strArr[1];
+    $ip = $strArr[2];
+    $port = $strArr[3];
+    $password = $strArr[4];
+    $connected = "1";
 
-	$sql = "SELECT * FROM `telegram` WHERE `chatID`= '$chatID' AND `name` = '$name'";
-	$sql = $db->query($sql);
+    $sql = "SELECT * FROM `telegram` WHERE `chatID`= '$chatID' AND `name` = '$name'";
+    $sql = $db->query($sql);
 
-	if (!$sql){
-		sendMessage("Query failed: " .$db->error);
-		die();
-	}
+    if (!$sql){
+        sendMessage("Query failed: " .$db->error);
+        die();
+    }
 
-	if (empty($ip)){
-		if ($sql->num_rows > 0){
-			$result = $sql->fetch_array();
+    if (empty($ip)){
+        if ($sql->num_rows > 0){
+            $result = $sql->fetch_array();
 
-			sendMessage("Connecting to $name ". $result['ip'] . ":" .$result['port']. " ...");
+            sendMessage("Connecting to $name ". $result['ip'] . ":" .$result['port']. " ...");
 
             try{
                 $rcon = new SourceQuery();
@@ -181,23 +176,22 @@ else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
                 $rcon->Disconnect();
             }
 
-			$sql->close();
-			$db->close();
-			die();
-		}
-
-		sendMessage("A server called '$name' doesn't exist");
-	}
-	else if(empty($ip) || empty($port) || empty($password)){
-		sendMessage("Invalid RCON format:  /rcon (Name) (IP) (Port) (Password)");
-	}
-	else{
-		if ($sql->num_rows > 0){
-			sendMessage("A server called '$name' already exists!");
-			$sql->close();
-			$db->close();
-		}
-		else {
+            $sql->close();
+            $db->close();
+        }
+        else
+            sendMessage("A server called '$name' doesn't exist");
+    }
+    else if(empty($ip) || empty($port) || empty($password)){
+        sendMessage("Invalid RCON format:  /rcon (Name) (IP) (Port) (Password)");
+    }
+    else{
+        if ($sql->num_rows > 0){
+            sendMessage("A server called '$name' already exists!");
+            $sql->close();
+            $db->close();
+        }
+        else {
             sendMessage(sprintf("Connecting to %s:%s (%s) ...", $ip, $port, $name));
 
             try {
@@ -217,20 +211,58 @@ else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
                 $rcon->Disconnect();
             }
         }
-	}
-	$sql->close();
-	$db->close();
+    }
+    $sql->close();
+    $db->close();
 }
+//Invalid RCON format
 else if (substr($message, 0, 5) === "/rcon" && strlen($message) == 5)  {
-	sendMessage("Invalid RCON format:  /rcon (Name) (IP) (Port) (Password)");
+    sendMessage("Invalid command format:  /rcon (Name) (IP) (Port) (Password)");
 }
-else{
-	sendMessage("Unknown command: <code>$message</code>, type /start to display the available commands!");
+//Serverlist command
+else if (substr($message, 0, 5) === "/info" && $message[5] == " ") {
+    $message = trim(preg_replace('/\s\s+/', ' ', str_replace("\n", " ", $message)));
+    $explode = explode(" ", $message, 2);
+
+    $strArr = $explode;
+    $name = $strArr[1];
+
+    $sql = "SELECT * FROM `telegram` WHERE `chatID`= '$chatID' AND `name` = '$name'";
+    $sql = $db->query($sql);
+
+    if ($sql->num_rows == 0){
+        sendMessage("Unable to find a server named: " .$name);
+    }
+    else {
+
+        try {
+            $result = $sql->fetch_array();
+            $rcon = new SourceQuery();
+            $rcon->Connect("hexah.net", 27015);
+
+            $rcon->SetRconPassword("koala");
+
+            print_r($rcon->GetRules());
+
+            $players = $rcon->GetPlayers();
+            //$reply;
+
+            // foreach ($players as $player) {
+            //     $reply = sprintf("%s\n", $player['name']);
+            // }
+            //sendMessage("b");
+        } catch (Exception $e) {
+            sendMessage($e->getMessage());
+        } finally {
+            $rcon->Disconnect();
+        }
+    }
 }
 
 function sendMessage($text){
-	global $chatID;
-	$sendto = API_URL."sendmessage?chat_id=".$chatID."&text=".urlencode($text)."&parse_mode=html";
+    echo $text;
+    global $chatID;
+    $sendto = API_URL."sendmessage?chat_id=".$chatID."&text=".urlencode($text)."&parse_mode=html";
 
-	file_get_contents($sendto);
+    file_get_contents($sendto);
 }
