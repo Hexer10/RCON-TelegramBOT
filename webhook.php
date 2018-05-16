@@ -1,8 +1,6 @@
 <?php
 require("config.php");
-require_once 'SourceQuery/bootstrap.php';
-
-use xPaw\SourceQuery\SourceQuery;
+require "SteamCondenser/steam-condenser.php";
 
 define('API_URL', 'https://api.telegram.org/bot'.$token.'/');
 //read incoming info and grab the chatID
@@ -52,17 +50,19 @@ if ($sql->num_rows > 0){
         else {
             sendMessage("Sending command: $message");
             try {
-                $rcon = new SourceQuery();
+                $rcon = new SourceServer($result['ip'], $result['port']);
 
-                $rcon->Connect($result['ip'], $result['port']);
-
-                $rcon->SetRconPassword($result['password']);
-
-                sendMessage($rcon->Rcon(sprintf("%s", $message))); //Fix injections?
+                $rcon->rconAuth($result['password']);
+                if (!$rcon->isRconAuthenticated()){
+                    sendMessage("Wrong RCON Password.\nDisconnecting...");
+                    $sql = "UPDATE `telegram` SET `connected` = '0' WHERE `chatID` = $chatID";
+                    $sql = $db->query($sql);
+                }
+                else {
+                    sendMessage($rcon->rconExec(sprintf("%s", $message))); //Fix injections?
+                }
             } catch (Exception $e) {
                 sendMessage($e->getMessage());
-            } finally {
-                $rcon->Disconnect();
             }
         }
     }
@@ -150,21 +150,21 @@ else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
             sendMessage("Connecting to $name ". $result['ip'] . ":" .$result['port']. " ...");
 
             try{
-                $rcon = new SourceQuery();
-                $rcon->Connect($result['ip'], $result['port']);
 
-                $rcon->SetRconPassword($result['password']);
+                $rcon = new SourceServer($result['ip'], $result['port']);
 
-                $sql = "UPDATE `telegram` SET `connected` = '1' WHERE `chatID`= '$chatID' AND `name` = '$name'";
-                $sql = $db->query($sql);
+                $rcon->rconAuth($result['password']);
+                if (!$rcon->isRconAuthenticated()){
+                    sendMessage("Wrong RCON Password.");
+                }
+                else {
+                    $sql = "UPDATE `telegram` SET `connected` = '1' WHERE `chatID`= '$chatID' AND `name` = '$name'";
+                    $sql = $db->query($sql);
 
-                sendMessage("Connected!");
-            }
-            catch(Exception $e) {
+                    sendMessage("Connected!");
+                }
+            } catch(Exception $e) {
                 sendMessage($e->getMessage());
-            }
-            finally {
-                $rcon->Disconnect();
             }
 
             $sql->close();
@@ -189,20 +189,21 @@ else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
             sendMessage(sprintf("Connecting to %s:%s (%s) ...", $ip, $port, $name));
 
             try {
-                $rcon = new SourceQuery();
-                $rcon->Connect($ip, $port);
+                $rcon = new SourceServer($result['ip'], $result['port']);
 
-                $rcon->SetRconPassword($password);
+                $rcon->rconAuth($password);
+                if (!$rcon->isRconAuthenticated()){
+                    sendMessage("Wrong RCON Password.\n");
+                }
+                else {
+                    $sql = $db->prepare("INSERT INTO `telegram`(`chatID`, `name`, `ip`, `port`, `password`, `connected`) VALUES (?,?,?,?,?,?)");
+                    $sql->bind_param("ssssss", $chatID, $name, $ip, $port, $password, $connected);
 
-                $sql = $db->prepare("INSERT INTO `telegram`(`chatID`, `name`, `ip`, `port`, `password`, `connected`) VALUES (?,?,?,?,?,?)");
-                $sql->bind_param("ssssss", $chatID, $name, $ip, $port, $password, $connected);
-
-                $sql->execute();
-                sendMessage("Connected successfully!");
+                    $sql->execute();
+                    sendMessage("Connected successfully!");
+                };
             } catch (Exception $e) {
                 sendMessage($e->getMessage());
-            } finally {
-                $rcon->Disconnect();
             }
         }
     }
@@ -212,6 +213,46 @@ else if (substr($message, 0, 5) === "/rcon" && $message[5] == " ")  {
 //Invalid RCON format
 else if (substr($message, 0, 5) === "/rcon" && strlen($message) == 5)  {
     sendMessage("Invalid command format:  /rcon (Name) (IP) (Port) (Password)");
+}
+//Info Command
+else if (substr($message, 0, 5) === "/info" && $message[5] == " ") {
+    $message = trim(preg_replace('/\s\s+/', ' ', str_replace("\n", " ", $message)));
+    $explode = explode(" ", $message, 5);
+
+    $strArr = $explode;
+
+    $name = $strArr[1];
+
+    $sql = "SELECT * FROM `telegram` WHERE `chatID`= '$chatID' AND `name` = '$name'";
+    $sql = $db->query($sql);
+
+    if ($sql->num_rows > 0) {
+        $result = $sql->fetch_array();
+
+        try {
+            $rcon = new SourceServer($result['ip'], $result['port']);
+
+            $players = $rcon->getPlayers();
+            if (count($players) === 0){
+                sendMessage("Server clear!");
+            }
+            else {
+                foreach ($players as $player){
+                    $PlayersMessage = sprintf("%s\n%d. %s", $PlayersMessage, ++$i, substr($player, 3));
+                }
+                sendMessage($PlayersMessage);
+            }
+        } catch (Exception $e) {
+            sendMessage($e->getMessage());
+        }
+    }
+    else{
+        sendMessage("Unknown server: <code>$name</code>.");
+    }
+}
+//Invalid Info format
+else if (substr($message, 0, 5) === "/info" && strlen($message) == 5)  {
+    sendMessage("Invalid command format:  /info (ServerName)");
 }
 //Invalid command
 else{
